@@ -1,0 +1,42 @@
+#BSUB -L /bin/bash
+#BSUB -J align_SV[1-7]
+#BSUB -n 16
+#BSUB -M 32GB
+#BSUB -R "span[hosts=1] rusage[mem=32GB]"
+#BSUB -q short
+#BSUB -app large
+#BSUB -o align_SV_%J_%I.out
+#BSUB -e align_SV_%J_%I.err
+
+parent=/path/to/parent/
+project=project_dir
+
+ml ib python/3.8.0
+
+source /path-to-cuteSV-venv/cuteSV/bin/activate
+my_bwa=/path-to-program/bwa-0.7.17/bwa
+my_stools=/path-to-program/samtools-1.9/samtools
+my_cuteSV=/path-to-cuteSV-venv/cuteSV/bin/cuteSV
+
+config=${parent}/${project}/config.txt
+
+##############################
+i=$(($LSB_JOBINDEX))
+config_ln=$(sed "${i}q;d" $config)
+sample=$(echo $config_ln | awk '{print $1}')
+genome=$(echo $config_ln | awk '{print $2}')
+
+mkdir ${parent}/${project}/01.alignment
+mkdir -p ${parent}/${project}/02.cuteSV/temp_workdir/${sample}
+mkdir ${parent}/${project}/02.single_source_reads
+
+${my_bwa} mem ${parent}/${project}/viral_genome/${genome}.fasta -t 16 ${parent}/${project}/00.fastq/${sample}.fastq | ${my_stools} view -h -b -F 4 - | ${my_stools} sort -o ${parent}/${project}/01.alignment/${sample}_hybalign.bam -
+${my_stools} index ${parent}/${project}/01.alignment/${sample}_hybalign.bam
+
+## current implementation for single chromosome reads - ignores mapping quality, etc.
+${my_stools} sort -n -O SAM ${parent}/${project}/01.alignment/${sample}_hybalign.bam | grep -v "^@" | awk '{print $3,$1}' | uniq | uniq -u -f1 > ${parent}/${project}/02.single_source_reads/${sample}_read-chromosomes.txt
+awk '{print $1}' ${parent}/${project}/02.single_source_reads/${sample}_read-chromosomes.txt | sort | uniq -c > ${parent}/${project}/02.single_source_reads/${sample}_chromosome-counts.txt
+
+${my_cuteSV} --sample ${sample} --report_readid --min_support 0 ${parent}/${project}/01.alignment/${sample}_hybalign.bam ${parent}/${project}/viral_genome/${genome}.fasta ${parent}/${project}/02.cuteSV/${sample}_cuteSV.vcf ${parent}/${project}/02.cuteSV/temp_workdir/${sample}
+
+

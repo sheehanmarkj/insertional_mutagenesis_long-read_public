@@ -1,0 +1,28 @@
+#BSUB -L /bin/bash
+#BSUB -J reconstruct_IS[7-7]
+#BSUB -n 8
+#BSUB -q express
+#BSUB -app medium
+#BSUB -o reconstruct_IS_%J_%I.out
+#BSUB -e reconstruct_IS_%J_%I.err
+
+parent=/path/to/parent/
+project=project_dir
+
+ml ib R/4.1.2
+
+config=${parent}/${project}/config.txt
+#genome_config=./genome_config.txt
+
+##############################
+i=$(($LSB_JOBINDEX))
+config_ln=$(sed "${i}q;d" $config)
+sample=$(echo $config_ln | awk '{print $1}')
+#genome=$(echo $config_ln | awk '{print $2}')
+#genome_path=/hpc/grid/dsrd-invtox/workspace/sheehm10/CompTox_insertmuta_DNA/JAX/20230516_draft_analysis/genome/
+
+mkdir ${parent}/${project}/03.reconstruct_IS
+
+Rscript ${parent}/${project}/functions/sub.02-1.vcf_getBNDs.R ${parent}/${project}/02.cuteSV/${sample}_cuteSV.vcf ${parent}/${project}/viral_genome/vector_elems.txt > ${parent}/${project}/03.reconstruct_IS/${sample}_SVs.tsv
+Rscript ${parent}/${project}/functions/sub.02-2.reconstruct_IS_update.R ${parent}/${project}/01.alignment/${sample}_hybalign.bam ${parent}/${project}/03.reconstruct_IS/${sample}_SVs.tsv ${parent}/${project}/viral_genome/vector_elems.txt > ${parent}/${project}/03.reconstruct_IS/${sample}_IS_reads.tsv
+

@@ -1,0 +1,46 @@
+#BSUB -L /bin/bash
+#BSUB -J vector_pull[1-7]
+#BSUB -n 16
+#BSUB -M 32GB
+#BSUB -R "span[hosts=1] rusage[mem=32GB]"
+#BSUB -q short
+#BSUB -app large
+#BSUB -o vector_reads_%J_%I.out
+#BSUB -e vector_reads_%J_%I.err
+
+parent=/path/to/parent/
+project=project_dir
+
+module load eb/2017  GCC/5.4.0-2.27  OpenMPI/2.0.0 cutadapt/1.9.1-Python-2.7.12
+
+my_stools=/path-to-program/samtools-1.9/samtools
+my_extract=/path-to-program/extract_reads.py
+
+config=${parent}/${project}/config.txt
+
+##############################
+i=$(($LSB_JOBINDEX))
+config_ln=$(sed "${i}q;d" $config)
+sample=$(echo $config_ln | awk '{print $1}')
+
+
+sort_dir=${parent}/${project}/03.vector_only_reads/temp_sortdir/${sample}
+mkdir -p ${sort_dir}
+
+## grep reads matching vector
+grep -Ff ${parent}/${project}/viral_genome/vector_elems.txt ${parent}/${project}/02.single_source_reads/${sample}_read-chromosomes.txt | awk '{print $2}' > ${parent}/${project}/02.single_source_reads/${sample}_vector_reads.txt
+
+## bam extract matching reads
+
+python ${my_extract} -b ${parent}/${project}/01.alignment/${sample}_hybalign.bam -n ${parent}/${project}/02.single_source_reads/${sample}_vector_reads.txt -o ${parent}/${project}/03.vector_only_reads/${sample}_vector_reads.bam
+
+## pull read info to txt
+
+${my_stools} view ${parent}/${project}/03.vector_only_reads/${sample}_vector_reads.bam | cut -f 1,2,3,4,6,9 | sort -T ${sort_dir} | uniq > ${parent}/${project}/03.vector_only_reads/${sample}_vector_reads_info.txt
+
+ml ib R/4.1.2
+
+## reconstruct vector reads
+Rscript ${parent}/${project}/functions/sub.02-2.reconstruct_IS_update.R ${parent}/${project}/03.vector_only_reads/${sample}_vector_reads.bam ${parent}/${project}/viral_genome/vector_elems.txt > ${parent}/${project}/03.vector_only_reads/${sample}_vector_reads.tsv
+
+

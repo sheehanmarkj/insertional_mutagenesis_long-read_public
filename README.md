@@ -56,6 +56,7 @@ bsub < ${parent}/${project}/functions/run.02.get_vector_reads.bsub
   *  03.reconstruct\_IS:
       *  \{sample\}\_SVs.tsv: host-vector breakpoint location information per read - each breakpoint within a read will have its own line
       *  \{sample\}\_IS\_reads.tsv: reconstructed reads, one line per read: read	qwidth	IS\_read	IS\_read\_simplified	IS\_read\_mapq
+       * IS_read: for unaligned portions, [nbase:S]; for aligned portions, [nbase_query:chrom:start_ref-end_ref] 
   *  03.vector\_only\_reads: read names, read info, and subset bams for vector-only reads
 
 ### Proceed to figure generation and other secondary analyses
